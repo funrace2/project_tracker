@@ -1,0 +1,15 @@
+# ========================================
+# Project Tracker - Required Packages
+# ========================================
+
+# Web Framework
+streamlit==1.28.0
+
+# Data Processing
+pandas==2.0.0
+
+# Visualization
+plotly==5.18.0
+
+# Database
+mysql-connector-python==8.0.33
