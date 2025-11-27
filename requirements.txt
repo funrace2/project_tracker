@@ -12,4 +12,4 @@ pandas==2.0.0
 plotly==5.18.0
 
 # Database
-mysql-connector-python==8.0.33
+mysql-connector-python==9.5.0
