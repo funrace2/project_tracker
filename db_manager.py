@@ -75,14 +75,16 @@ def execute_query(query: str, params: tuple = None, fetch: bool = False) -> Opti
 # 프로젝트 관련 함수
 # ========================================
 
-def insert_project(name: str, description: str = None, start_date: date = None,
-                   target_end_date: date = None, status: str = 'active') -> Optional[int]:
+def insert_project(name: str, description: str = None, github_url: str = None,
+                   start_date: date = None, target_end_date: date = None,
+                   status: str = 'active') -> Optional[int]:
     """
     프로젝트 생성
 
     Args:
         name: 프로젝트명
         description: 설명
+        github_url: GitHub 저장소 URL
         start_date: 시작일
         target_end_date: 목표 완료일
         status: 상태 (active/completed/on_hold)
@@ -94,10 +96,10 @@ def insert_project(name: str, description: str = None, start_date: date = None,
         start_date = date.today()
 
     query = """
-        INSERT INTO projects (name, description, start_date, target_end_date, status)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO projects (name, description, github_url, start_date, target_end_date, status)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """
-    params = (name, description, start_date, target_end_date, status)
+    params = (name, description, github_url, start_date, target_end_date, status)
     return execute_query(query, params)
 
 
@@ -143,7 +145,7 @@ def update_project(project_id: int, **kwargs) -> bool:
 
     Args:
         project_id: 프로젝트 ID
-        **kwargs: 수정할 필드들 (name, description, start_date, target_end_date, status)
+        **kwargs: 수정할 필드들 (name, description, github_url, start_date, target_end_date, status)
 
     Returns:
         bool: 성공 여부
@@ -152,7 +154,7 @@ def update_project(project_id: int, **kwargs) -> bool:
     values = []
 
     for key, value in kwargs.items():
-        if key in ['name', 'description', 'start_date', 'target_end_date', 'status']:
+        if key in ['name', 'description', 'github_url', 'start_date', 'target_end_date', 'status']:
             fields.append(f"{key} = %s")
             values.append(value)
 

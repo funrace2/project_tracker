@@ -40,6 +40,9 @@ if 'view_task_id' not in st.session_state:
 if 'edit_task_id' not in st.session_state:
     st.session_state.edit_task_id = None
 
+if 'edit_project_id' not in st.session_state:
+    st.session_state.edit_project_id = None
+
 
 # ========================================
 # 사이드바 - 프로젝트 관리
@@ -106,6 +109,11 @@ def show_create_project_form():
     with st.form("create_project_form"):
         name = st.text_input("프로젝트명*", max_chars=200, placeholder="예: 감정 일기 앱")
         description = st.text_area("설명", height=100, placeholder="프로젝트에 대한 간단한 설명")
+        github_url = st.text_input(
+            "GitHub URL",
+            max_chars=500,
+            placeholder="예: https://github.com/username/repository"
+        )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -136,6 +144,7 @@ def show_create_project_form():
                 project_id = db.insert_project(
                     name=name.strip(),
                     description=description.strip() if description else None,
+                    github_url=github_url.strip() if github_url else None,
                     start_date=start_date,
                     target_end_date=target_end_date
                 )
@@ -147,6 +156,126 @@ def show_create_project_form():
                     st.rerun()
                 else:
                     st.error("프로젝트 생성에 실패했습니다.")
+
+
+@st.dialog("프로젝트 수정", width="large")
+def show_edit_project_dialog(project):
+    """프로젝트 수정 다이얼로그"""
+
+    # 삭제 확인 모드
+    if st.session_state.get('confirm_delete_project'):
+        st.error("⚠️ 정말로 이 프로젝트를 삭제하시겠습니까?")
+        st.warning("프로젝트의 모든 태스크와 데이터가 함께 삭제됩니다!")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("취소", use_container_width=True, type="secondary"):
+                st.session_state.confirm_delete_project = False
+                st.rerun()
+        with col2:
+            if st.button("🗑️ 삭제 확인", type="primary", use_container_width=True):
+                if db.delete_project(project['id']):
+                    st.success("프로젝트가 삭제되었습니다.")
+                    st.session_state.current_project_id = None
+                    st.session_state.edit_project_id = None
+                    st.session_state.confirm_delete_project = False
+                    st.rerun()
+                else:
+                    st.error("프로젝트 삭제에 실패했습니다.")
+        return
+
+    st.subheader("✏️ 프로젝트 정보 수정")
+
+    with st.form("edit_project_form"):
+        name = st.text_input(
+            "프로젝트명*",
+            value=project['name'],
+            max_chars=200,
+            placeholder="예: 감정 일기 앱"
+        )
+        description = st.text_area(
+            "설명",
+            value=project.get('description') or '',
+            height=100,
+            placeholder="프로젝트에 대한 간단한 설명"
+        )
+        github_url = st.text_input(
+            "GitHub URL",
+            value=project.get('github_url') or '',
+            max_chars=500,
+            placeholder="예: https://github.com/username/repository"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(
+                "시작일",
+                value=project['start_date'] if project.get('start_date') else date.today()
+            )
+        with col2:
+            target_end_date = st.date_input(
+                "목표 완료일",
+                value=project['target_end_date'] if project.get('target_end_date') else None
+            )
+
+        # 상태 선택
+        status_options = ['active', 'completed', 'on_hold']
+        status_labels = {
+            'active': '🔄 진행중',
+            'completed': '✅ 완료',
+            'on_hold': '⏸️ 보류'
+        }
+        current_status_index = status_options.index(project['status'])
+        status = st.selectbox(
+            "상태",
+            options=status_options,
+            format_func=lambda x: status_labels[x],
+            index=current_status_index
+        )
+
+        col_cancel, col_submit, col_delete = st.columns(3)
+
+        with col_cancel:
+            cancel = st.form_submit_button("취소", use_container_width=True)
+        with col_submit:
+            submit = st.form_submit_button("저장", type="primary", use_container_width=True)
+        with col_delete:
+            delete = st.form_submit_button("🗑️ 삭제", use_container_width=True)
+
+        if cancel:
+            st.session_state.edit_project_id = None
+            st.rerun()
+
+        if delete:
+            # 삭제 확인 모드로 전환
+            st.session_state.confirm_delete_project = True
+            st.rerun()
+
+        if submit:
+            # 입력 검증
+            errors = utils.validate_project_input(name, start_date, target_end_date)
+
+            if errors:
+                for error in errors:
+                    st.error(error)
+            else:
+                # 프로젝트 수정
+                success = db.update_project(
+                    project['id'],
+                    name=name.strip(),
+                    description=description.strip() if description else None,
+                    github_url=github_url.strip() if github_url else None,
+                    start_date=start_date,
+                    target_end_date=target_end_date,
+                    status=status
+                )
+
+                if success:
+                    st.success(f"✅ '{name}' 프로젝트가 수정되었습니다!")
+                    st.session_state.edit_project_id = None
+                    st.rerun()
+                else:
+                    st.error("프로젝트 수정에 실패했습니다.")
 
 
 # ========================================
@@ -170,7 +299,28 @@ def render_main_content():
         return
 
     # 프로젝트 헤더
-    st.title(f"📋 {project['name']}")
+    if project.get('github_url'):
+        header_col1, header_col2, header_col3 = st.columns([3, 1, 1])
+        with header_col1:
+            st.title(f"📋 {project['name']}")
+        with header_col2:
+            st.link_button(
+                "💻 GitHub",
+                project['github_url'],
+                use_container_width=True
+            )
+        with header_col3:
+            if st.button("✏️ 수정", use_container_width=True):
+                st.session_state.edit_project_id = project['id']
+                st.rerun()
+    else:
+        header_col1, header_col2 = st.columns([4, 1])
+        with header_col1:
+            st.title(f"📋 {project['name']}")
+        with header_col2:
+            if st.button("✏️ 수정", use_container_width=True):
+                st.session_state.edit_project_id = project['id']
+                st.rerun()
 
     # 프로젝트 정보
     col1, col2, col3 = st.columns(3)
@@ -212,6 +362,10 @@ def render_main_content():
 
     with tab3:
         render_retrospective_tab(project)
+
+    # 프로젝트 수정 다이얼로그
+    if st.session_state.edit_project_id == project['id']:
+        show_edit_project_dialog(project)
 
 
 # ========================================
@@ -805,10 +959,197 @@ def show_task_edit_form(task):
 def render_retrospective_tab(project):
     """회고 탭 렌더링"""
 
-    st.subheader("📝 프로젝트 회고 (KPT)")
+    project_id = project['id']
 
-    # TODO: 회고 기능 구현
-    st.info("🚧 회고 기능은 다음 단계에서 구현됩니다.")
+    st.subheader("📝 프로젝트 회고 (KPT)")
+    st.caption("Keep(계속할 것), Problem(문제점), Try(시도할 것)")
+
+    # 기존 회고 데이터 가져오기
+    retrospective = db.get_retrospective(project_id)
+
+    # 편집 모드 상태 초기화
+    if 'edit_retrospective' not in st.session_state:
+        st.session_state.edit_retrospective = False
+
+    st.markdown("---")
+
+    # 회고가 없는 경우 - 작성 폼
+    if not retrospective:
+        st.info("📝 아직 작성된 회고가 없습니다. 프로젝트를 진행하면서 배운 점을 기록해보세요!")
+
+        with st.form("create_retrospective_form"):
+            st.markdown("### 🟢 Keep (계속할 것)")
+            st.caption("잘했던 점, 앞으로도 계속 유지하고 싶은 것")
+            keep_content = st.text_area(
+                "Keep",
+                height=150,
+                placeholder="예:\n- 매일 아침 스탠드업 미팅\n- 코드 리뷰 문화\n- 페어 프로그래밍",
+                label_visibility="collapsed"
+            )
+
+            st.markdown("### 🔴 Problem (문제점)")
+            st.caption("어려웠던 점, 개선이 필요한 부분")
+            problem_content = st.text_area(
+                "Problem",
+                height=150,
+                placeholder="예:\n- 일정 관리의 어려움\n- 기술 스택 선택의 고민\n- 팀 커뮤니케이션 부족",
+                label_visibility="collapsed"
+            )
+
+            st.markdown("### 🟡 Try (시도할 것)")
+            st.caption("다음에 시도해볼 것, 개선 방안")
+            try_content = st.text_area(
+                "Try",
+                height=150,
+                placeholder="예:\n- 스프린트 계획 세우기\n- 더 자주 배포하기\n- 문서화 습관 들이기",
+                label_visibility="collapsed"
+            )
+
+            st.markdown("### 📚 Learning (배운 점)")
+            st.caption("프로젝트를 통해 배운 기술이나 인사이트")
+            learning_content = st.text_area(
+                "Learning",
+                height=150,
+                placeholder="예:\n- React Hooks 사용법\n- REST API 설계 원칙\n- Git 브랜치 전략",
+                label_visibility="collapsed"
+            )
+
+            submitted = st.form_submit_button("💾 회고 저장", type="primary", use_container_width=True)
+
+            if submitted:
+                retrospective_id = db.insert_retrospective(
+                    project_id=project_id,
+                    keep_content=keep_content.strip() if keep_content else None,
+                    problem_content=problem_content.strip() if problem_content else None,
+                    try_content=try_content.strip() if try_content else None,
+                    learning_content=learning_content.strip() if learning_content else None
+                )
+
+                if retrospective_id:
+                    st.success("✅ 회고가 저장되었습니다!")
+                    st.rerun()
+                else:
+                    st.error("회고 저장에 실패했습니다.")
+
+    # 회고가 있는 경우 - 읽기 또는 수정 모드
+    else:
+        # 수정/읽기 모드 토글 버튼
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.session_state.edit_retrospective:
+                if st.button("❌ 취소", use_container_width=True):
+                    st.session_state.edit_retrospective = False
+                    st.rerun()
+            else:
+                if st.button("✏️ 수정", use_container_width=True, type="primary"):
+                    st.session_state.edit_retrospective = True
+                    st.rerun()
+
+        # 읽기 모드
+        if not st.session_state.edit_retrospective:
+            # Keep
+            st.markdown("### 🟢 Keep (계속할 것)")
+            if retrospective.get('keep_content'):
+                st.markdown(retrospective['keep_content'])
+            else:
+                st.caption("_작성된 내용이 없습니다._")
+
+            st.markdown("---")
+
+            # Problem
+            st.markdown("### 🔴 Problem (문제점)")
+            if retrospective.get('problem_content'):
+                st.markdown(retrospective['problem_content'])
+            else:
+                st.caption("_작성된 내용이 없습니다._")
+
+            st.markdown("---")
+
+            # Try
+            st.markdown("### 🟡 Try (시도할 것)")
+            if retrospective.get('try_content'):
+                st.markdown(retrospective['try_content'])
+            else:
+                st.caption("_작성된 내용이 없습니다._")
+
+            st.markdown("---")
+
+            # Learning
+            st.markdown("### 📚 Learning (배운 점)")
+            if retrospective.get('learning_content'):
+                st.markdown(retrospective['learning_content'])
+            else:
+                st.caption("_작성된 내용이 없습니다._")
+
+            st.markdown("---")
+
+            # 작성 시간
+            if retrospective.get('created_at'):
+                st.caption(f"📅 작성일: {utils.format_datetime(retrospective['created_at'])}")
+            if retrospective.get('updated_at') and retrospective.get('updated_at') != retrospective.get('created_at'):
+                st.caption(f"🔄 수정일: {utils.format_datetime(retrospective['updated_at'])}")
+
+        # 수정 모드
+        else:
+            with st.form("edit_retrospective_form"):
+                st.markdown("### 🟢 Keep (계속할 것)")
+                keep_content = st.text_area(
+                    "Keep",
+                    value=retrospective.get('keep_content') or '',
+                    height=150,
+                    label_visibility="collapsed"
+                )
+
+                st.markdown("### 🔴 Problem (문제점)")
+                problem_content = st.text_area(
+                    "Problem",
+                    value=retrospective.get('problem_content') or '',
+                    height=150,
+                    label_visibility="collapsed"
+                )
+
+                st.markdown("### 🟡 Try (시도할 것)")
+                try_content = st.text_area(
+                    "Try",
+                    value=retrospective.get('try_content') or '',
+                    height=150,
+                    label_visibility="collapsed"
+                )
+
+                st.markdown("### 📚 Learning (배운 점)")
+                learning_content = st.text_area(
+                    "Learning",
+                    value=retrospective.get('learning_content') or '',
+                    height=150,
+                    label_visibility="collapsed"
+                )
+
+                col_cancel, col_submit = st.columns(2)
+
+                with col_cancel:
+                    cancel = st.form_submit_button("취소", use_container_width=True)
+                with col_submit:
+                    submit = st.form_submit_button("💾 저장", type="primary", use_container_width=True)
+
+                if cancel:
+                    st.session_state.edit_retrospective = False
+                    st.rerun()
+
+                if submit:
+                    success = db.update_retrospective(
+                        project_id=project_id,
+                        keep_content=keep_content.strip() if keep_content else None,
+                        problem_content=problem_content.strip() if problem_content else None,
+                        try_content=try_content.strip() if try_content else None,
+                        learning_content=learning_content.strip() if learning_content else None
+                    )
+
+                    if success:
+                        st.success("✅ 회고가 수정되었습니다!")
+                        st.session_state.edit_retrospective = False
+                        st.rerun()
+                    else:
+                        st.error("회고 수정에 실패했습니다.")
 
 
 # ========================================

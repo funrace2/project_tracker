@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(200) NOT NULL COMMENT '프로젝트명',
     description TEXT COMMENT '프로젝트 설명',
+    github_url VARCHAR(500) COMMENT 'GitHub 저장소 URL',
     start_date DATE NOT NULL COMMENT '시작일',
     target_end_date DATE COMMENT '목표 완료일',
     status ENUM('active', 'completed', 'on_hold') DEFAULT 'active' COMMENT '상태',
