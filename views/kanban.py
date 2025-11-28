@@ -109,33 +109,54 @@ def render_task_card(task, project_id):
             st.caption(due_badge)
 
         # 액션 버튼
-        btn_col1, btn_col2, btn_col3 = st.columns(3)
+        if task['status'] == 'in_progress':
+            # In Progress는 4개 버튼 (이전/다음 모두 표시)
+            btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
 
-        with btn_col1:
-            if st.button("👁️", key=f"view_{task['id']}", help="상세보기"):
-                st.session_state.view_task_id = task['id']
-                st.rerun()
-
-        with btn_col2:
-            # 상태 변경 버튼
-            if task['status'] == 'todo':
-                if st.button("▶️", key=f"status_{task['id']}", help="진행 시작"):
-                    db.update_task_status(task['id'], 'in_progress')
+            with btn_col1:
+                if st.button("👁️", key=f"view_{task['id']}", help="상세보기"):
+                    st.session_state.view_task_id = task['id']
                     st.rerun()
-            elif task['status'] == 'in_progress':
-                if st.button("✅", key=f"status_{task['id']}", help="완료"):
+
+            with btn_col2:
+                if st.button("◀️", key=f"prev_{task['id']}", help="To Do로 되돌리기"):
+                    db.update_task_status(task['id'], 'todo')
+                    st.rerun()
+
+            with btn_col3:
+                if st.button("✅", key=f"next_{task['id']}", help="완료"):
                     db.update_task_status(task['id'], 'done')
                     st.rerun()
-            elif task['status'] == 'done':
-                if st.button("↩️", key=f"status_{task['id']}", help="다시 진행중으로"):
-                    db.update_task_status(task['id'], 'in_progress')
+
+            with btn_col4:
+                if st.button("🗑️", key=f"delete_{task['id']}", help="삭제"):
+                    if db.delete_task(task['id']):
+                        st.success("태스크가 삭제되었습니다.")
+                        st.rerun()
+        else:
+            # To Do, Done은 3개 버튼
+            btn_col1, btn_col2, btn_col3 = st.columns(3)
+
+            with btn_col1:
+                if st.button("👁️", key=f"view_{task['id']}", help="상세보기"):
+                    st.session_state.view_task_id = task['id']
                     st.rerun()
 
-        with btn_col3:
-            if st.button("🗑️", key=f"delete_{task['id']}", help="삭제"):
-                if db.delete_task(task['id']):
-                    st.success("태스크가 삭제되었습니다.")
-                    st.rerun()
+            with btn_col2:
+                if task['status'] == 'todo':
+                    if st.button("▶️", key=f"status_{task['id']}", help="진행 시작"):
+                        db.update_task_status(task['id'], 'in_progress')
+                        st.rerun()
+                elif task['status'] == 'done':
+                    if st.button("↩️", key=f"status_{task['id']}", help="다시 진행중으로"):
+                        db.update_task_status(task['id'], 'in_progress')
+                        st.rerun()
+
+            with btn_col3:
+                if st.button("🗑️", key=f"delete_{task['id']}", help="삭제"):
+                    if db.delete_task(task['id']):
+                        st.success("태스크가 삭제되었습니다.")
+                        st.rerun()
 
         st.markdown("---")
 
