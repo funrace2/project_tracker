@@ -36,10 +36,8 @@ def render_sidebar():
                 metrics = utils.calculate_project_metrics(tasks)
 
                 # 프로젝트 버튼
-                button_label = f"{project['name']}\n{metrics['progress_rate']:.0f}% 완료"
-
                 if st.button(
-                    button_label,
+                    project['name'],
                     key=f"project_{project['id']}",
                     use_container_width=True,
                     type="primary" if st.session_state.current_project_id == project['id'] else "secondary"
@@ -47,10 +45,14 @@ def render_sidebar():
                     st.session_state.current_project_id = project['id']
                     st.rerun()
 
-                # 마지막 업데이트
-                if project.get('updated_at'):
-                    relative_time = utils.get_relative_time(project['updated_at'])
-                    st.caption(f"🕐 {relative_time}")
+                # 진행률 및 마지막 업데이트
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.caption(f"📊 {metrics['progress_rate']:.0f}% 완료")
+                with col2:
+                    if project.get('updated_at'):
+                        relative_time = utils.get_relative_time(project['updated_at'])
+                        st.caption(f"🕐 {relative_time}")
 
         st.markdown("---")
 
