@@ -77,7 +77,7 @@ def execute_query(query: str, params: tuple = None, fetch: bool = False) -> Opti
 
 def insert_project(name: str, description: str = None, github_url: str = None,
                    start_date: date = None, target_end_date: date = None,
-                   status: str = 'active') -> Optional[int]:
+                   status: str = 'active', user_id: int = None) -> Optional[int]:
     """
     프로젝트 생성
 
@@ -88,6 +88,7 @@ def insert_project(name: str, description: str = None, github_url: str = None,
         start_date: 시작일
         target_end_date: 목표 완료일
         status: 상태 (active/completed/on_hold)
+        user_id: 사용자 ID
 
     Returns:
         int: 생성된 프로젝트 ID 또는 None
@@ -96,10 +97,10 @@ def insert_project(name: str, description: str = None, github_url: str = None,
         start_date = date.today()
 
     query = """
-        INSERT INTO projects (name, description, github_url, start_date, target_end_date, status)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO projects (user_id, name, description, github_url, start_date, target_end_date, status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
-    params = (name, description, github_url, start_date, target_end_date, status)
+    params = (user_id, name, description, github_url, start_date, target_end_date, status)
     return execute_query(query, params)
 
 
@@ -118,24 +119,34 @@ def get_project(project_id: int) -> Optional[Dict]:
     return result[0] if result else None
 
 
-def get_projects(status: str = None) -> List[Dict]:
+def get_projects(status: str = None, user_id: int = None) -> List[Dict]:
     """
     프로젝트 목록 조회
 
     Args:
         status: 필터링할 상태 (None이면 전체)
+        user_id: 사용자 ID (None이면 전체, 지정하면 해당 사용자의 프로젝트만)
 
     Returns:
         list: 프로젝트 리스트
     """
+    conditions = []
+    params = []
+
+    if user_id is not None:
+        conditions.append("user_id = %s")
+        params.append(user_id)
+
     if status:
-        query = "SELECT * FROM projects WHERE status = %s ORDER BY created_at DESC"
-        params = (status,)
+        conditions.append("status = %s")
+        params.append(status)
+
+    if conditions:
+        query = f"SELECT * FROM projects WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"
     else:
         query = "SELECT * FROM projects ORDER BY created_at DESC"
-        params = None
 
-    result = execute_query(query, params, fetch=True)
+    result = execute_query(query, tuple(params) if params else None, fetch=True)
     return result or []
 
 
@@ -591,3 +602,101 @@ def get_all_retrospectives() -> List[Dict]:
     """
     result = execute_query(query, fetch=True)
     return result or []
+
+
+# ========================================
+# 사용자 인증 관련 함수
+# ========================================
+
+import hashlib
+
+
+def hash_password(password: str) -> str:
+    """
+    비밀번호 해싱
+
+    Args:
+        password: 평문 비밀번호
+
+    Returns:
+        str: 해시된 비밀번호
+    """
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def create_user(email: str, password: str, username: str) -> Optional[int]:
+    """
+    사용자 생성 (회원가입)
+
+    Args:
+        email: 이메일
+        password: 비밀번호 (평문)
+        username: 사용자 이름
+
+    Returns:
+        int: 생성된 사용자 ID 또는 None
+    """
+    password_hash = hash_password(password)
+
+    query = """
+        INSERT INTO users (email, password_hash, username)
+        VALUES (%s, %s, %s)
+    """
+    params = (email, password_hash, username)
+    return execute_query(query, params)
+
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """
+    이메일로 사용자 조회
+
+    Args:
+        email: 이메일
+
+    Returns:
+        dict: 사용자 정보 또는 None
+    """
+    query = "SELECT * FROM users WHERE email = %s"
+    result = execute_query(query, (email,), fetch=True)
+    return result[0] if result else None
+
+
+def verify_user(email: str, password: str) -> Optional[Dict]:
+    """
+    사용자 인증 (로그인)
+
+    Args:
+        email: 이메일
+        password: 비밀번호 (평문)
+
+    Returns:
+        dict: 인증 성공 시 사용자 정보, 실패 시 None
+    """
+    user = get_user_by_email(email)
+
+    if not user:
+        return None
+
+    password_hash = hash_password(password)
+
+    if user['password_hash'] == password_hash:
+        # 마지막 로그인 시간 업데이트
+        update_last_login(user['id'])
+        return user
+
+    return None
+
+
+def update_last_login(user_id: int) -> bool:
+    """
+    마지막 로그인 시간 업데이트
+
+    Args:
+        user_id: 사용자 ID
+
+    Returns:
+        bool: 성공 여부
+    """
+    query = "UPDATE users SET last_login = NOW() WHERE id = %s"
+    result = execute_query(query, (user_id,))
+    return result is not None and result > 0

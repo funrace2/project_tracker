@@ -7,6 +7,7 @@ import streamlit as st
 import db_manager as db
 import utils
 from config import APP_TITLE
+from views import logout
 
 
 def render_sidebar():
@@ -14,6 +15,13 @@ def render_sidebar():
 
     with st.sidebar:
         st.title(APP_TITLE)
+
+        # 사용자 정보 및 로그아웃
+        if st.session_state.user:
+            st.caption(f"👤 {st.session_state.user['username']}")
+            if st.button("🚪 로그아웃", use_container_width=True):
+                logout()
+
         st.markdown("---")
 
         # 새 프로젝트 버튼
@@ -25,7 +33,9 @@ def render_sidebar():
         # 프로젝트 목록
         st.subheader("📋 프로젝트")
 
-        projects = db.get_projects(status='active')
+        # 현재 로그인한 사용자의 프로젝트만 조회
+        user_id = st.session_state.user['id'] if st.session_state.user else None
+        projects = db.get_projects(status='active', user_id=user_id)
 
         if not projects:
             st.info("프로젝트가 없습니다.\n새 프로젝트를 만들어보세요!")
@@ -57,7 +67,7 @@ def render_sidebar():
         st.markdown("---")
 
         # 완료된 프로젝트 표시
-        completed_projects = db.get_projects(status='completed')
+        completed_projects = db.get_projects(status='completed', user_id=user_id)
         if completed_projects:
             with st.expander("✅ 완료된 프로젝트"):
                 for project in completed_projects:

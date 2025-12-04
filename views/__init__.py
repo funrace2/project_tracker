@@ -6,9 +6,12 @@ Project Tracker - Views
 from .dashboard import render_dashboard_tab
 from .kanban import render_kanban_tab
 from .retrospective import render_retrospective_tab
+from .auth import show_auth_page, logout
 
 __all__ = [
     'render_dashboard_tab',
     'render_kanban_tab',
     'render_retrospective_tab',
+    'show_auth_page',
+    'logout',
 ]

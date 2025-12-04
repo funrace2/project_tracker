@@ -48,13 +48,15 @@ def show_create_project_form():
                 for error in errors:
                     st.error(error)
             else:
-                # 프로젝트 생성
+                # 프로젝트 생성 (현재 로그인한 사용자의 ID 포함)
+                user_id = st.session_state.user['id'] if st.session_state.user else None
                 project_id = db.insert_project(
                     name=name.strip(),
                     description=description.strip() if description else None,
                     github_url=github_url.strip() if github_url else None,
                     start_date=start_date,
-                    target_end_date=target_end_date
+                    target_end_date=target_end_date,
+                    user_id=user_id
                 )
 
                 if project_id:

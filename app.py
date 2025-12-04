@@ -13,6 +13,9 @@ from components import (
     render_main_content
 )
 
+# Views
+from views import show_auth_page
+
 
 # ========================================
 # 페이지 설정
@@ -25,6 +28,14 @@ st.set_page_config(**PAGE_CONFIG)
 # 세션 상태 초기화
 # ========================================
 
+# 인증 관련
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+# 프로젝트 관련
 if 'current_project_id' not in st.session_state:
     st.session_state.current_project_id = None
 
@@ -50,6 +61,11 @@ if 'edit_project_id' not in st.session_state:
 
 def main():
     """메인 함수"""
+
+    # 로그인 체크
+    if not st.session_state.authenticated:
+        show_auth_page()
+        return
 
     # 사이드바 렌더링
     render_sidebar()
