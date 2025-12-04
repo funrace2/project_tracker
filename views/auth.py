@@ -10,8 +10,9 @@ import extra_streamlit_components as stx
 import hashlib
 
 
-# 쿠키 매니저 초기화
-cookie_manager = stx.CookieManager()
+def get_cookie_manager():
+    """쿠키 매니저 가져오기 (지연 초기화)"""
+    return stx.CookieManager()
 
 
 def create_auth_token(user_id: int, email: str) -> str:
@@ -32,6 +33,7 @@ def create_auth_token(user_id: int, email: str) -> str:
 
 def save_login_cookie(user_id: int, email: str):
     """로그인 쿠키 저장"""
+    cookie_manager = get_cookie_manager()
     token = create_auth_token(user_id, email)
     cookie_manager.set('auth_token', token, expires_at=None)  # 브라우저 종료 시까지 유지
     cookie_manager.set('user_id', str(user_id), expires_at=None)
@@ -40,6 +42,7 @@ def save_login_cookie(user_id: int, email: str):
 
 def clear_login_cookie():
     """로그인 쿠키 삭제"""
+    cookie_manager = get_cookie_manager()
     cookie_manager.delete('auth_token')
     cookie_manager.delete('user_id')
     cookie_manager.delete('user_email')
@@ -53,6 +56,7 @@ def check_auto_login():
         dict: 사용자 정보 또는 None
     """
     try:
+        cookie_manager = get_cookie_manager()
         cookies = cookie_manager.get_all()
 
         if not cookies or 'auth_token' not in cookies:
