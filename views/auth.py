@@ -6,6 +6,79 @@ Project Tracker - Authentication Views
 import streamlit as st
 from db_manager import create_user, verify_user, get_user_by_email
 import re
+import extra_streamlit_components as stx
+import hashlib
+
+
+# 쿠키 매니저 초기화
+cookie_manager = stx.CookieManager()
+
+
+def create_auth_token(user_id: int, email: str) -> str:
+    """
+    인증 토큰 생성 (간단한 해시)
+
+    Args:
+        user_id: 사용자 ID
+        email: 이메일
+
+    Returns:
+        str: 인증 토큰
+    """
+    # 간단한 토큰 생성 (실제 운영환경에서는 JWT 사용 권장)
+    token_data = f"{user_id}:{email}:project_tracker_secret"
+    return hashlib.sha256(token_data.encode()).hexdigest()[:32]
+
+
+def save_login_cookie(user_id: int, email: str):
+    """로그인 쿠키 저장"""
+    token = create_auth_token(user_id, email)
+    cookie_manager.set('auth_token', token, expires_at=None)  # 브라우저 종료 시까지 유지
+    cookie_manager.set('user_id', str(user_id), expires_at=None)
+    cookie_manager.set('user_email', email, expires_at=None)
+
+
+def clear_login_cookie():
+    """로그인 쿠키 삭제"""
+    cookie_manager.delete('auth_token')
+    cookie_manager.delete('user_id')
+    cookie_manager.delete('user_email')
+
+
+def check_auto_login():
+    """
+    쿠키 확인하여 자동 로그인
+
+    Returns:
+        dict: 사용자 정보 또는 None
+    """
+    try:
+        cookies = cookie_manager.get_all()
+
+        if not cookies or 'auth_token' not in cookies:
+            return None
+
+        user_id = cookies.get('user_id')
+        user_email = cookies.get('user_email')
+        auth_token = cookies.get('auth_token')
+
+        if not user_id or not user_email or not auth_token:
+            return None
+
+        # 토큰 검증
+        expected_token = create_auth_token(int(user_id), user_email)
+        if auth_token != expected_token:
+            clear_login_cookie()
+            return None
+
+        # 사용자 정보 가져오기
+        user = get_user_by_email(user_email)
+        if user and user['id'] == int(user_id):
+            return user
+
+        return None
+    except:
+        return None
 
 
 def is_valid_email(email: str) -> bool:
@@ -47,8 +120,13 @@ def show_login_page():
                 else:
                     user = verify_user(email, password)
                     if user:
+                        # 세션에 사용자 정보 저장
                         st.session_state.user = user
                         st.session_state.authenticated = True
+
+                        # 쿠키에 로그인 정보 저장 (자동 로그인용)
+                        save_login_cookie(user['id'], user['email'])
+
                         st.success(f"환영합니다, {user['username']}님!")
                         st.rerun()
                     else:
@@ -113,6 +191,14 @@ def show_signup_page():
 def show_auth_page():
     """인증 페이지 (로그인 또는 회원가입)"""
 
+    # 자동 로그인 체크 (쿠키 확인)
+    if not st.session_state.authenticated:
+        user = check_auto_login()
+        if user:
+            st.session_state.user = user
+            st.session_state.authenticated = True
+            st.rerun()
+
     # 회원가입 페이지 표시 여부
     if 'show_signup' not in st.session_state:
         st.session_state.show_signup = False
@@ -125,6 +211,10 @@ def show_auth_page():
 
 def logout():
     """로그아웃"""
+    # 쿠키 삭제
+    clear_login_cookie()
+
+    # 세션 상태 초기화
     st.session_state.authenticated = False
     st.session_state.user = None
     st.rerun()
