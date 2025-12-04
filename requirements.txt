@@ -13,6 +13,3 @@ plotly==5.24.1
 
 # Database
 mysql-connector-python==9.5.0
-
-# Cookie
-extra-streamlit-components==0.1.81
