@@ -5,6 +5,10 @@
 [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.45+-red.svg)](https://streamlit.io/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.4+-orange.svg)](https://www.mysql.com/)
+[![Deploy](https://img.shields.io/badge/Deploy-Streamlit%20Cloud-FF4B4B.svg)](https://simple-project-tracker.streamlit.app/)
+[![Database](https://img.shields.io/badge/Database-AWS%20RDS-FF9900.svg)](https://aws.amazon.com/rds/)
+
+**🚀 [Live Demo - 바로 사용해보기](https://simple-project-tracker.streamlit.app/)**
 
 ## 📖 프로젝트 개요
 
@@ -23,6 +27,12 @@
 ---
 
 ## ✨ 주요 기능
+
+### 🔐 사용자 인증
+- 이메일 기반 회원가입 및 로그인
+- 비밀번호 암호화 (SHA-256)
+- 세션 기반 인증 관리
+- 사용자별 프로젝트 관리
 
 ### 📊 대시보드
 - 프로젝트 진행률을 한눈에 확인
@@ -85,6 +95,8 @@ pip install -r requirements.txt
 
 ### 3. 데이터베이스 설정
 
+#### 로컬 환경 (MySQL)
+
 ```bash
 # MySQL 접속
 mysql -u root -p
@@ -93,9 +105,17 @@ mysql -u root -p
 CREATE DATABASE project_tracker;
 exit;
 
-# 스키마 생성 (database/schema.sql 파일 실행)
+# 스키마 생성
 mysql -u root -p project_tracker < database/schema.sql
+
+# 사용자 인증 테이블 추가 (마이그레이션)
+mysql -u root -p project_tracker < database/migration_add_users.sql
 ```
+
+#### 클라우드 환경 (AWS RDS)
+
+배포 버전은 AWS RDS (MySQL)를 사용합니다.
+- RDS 인스턴스 생성 후 위 스키마 및 마이그레이션 파일을 실행하세요.
 
 ### 4. 비밀 정보 설정
 
@@ -108,6 +128,8 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 # secrets.toml 파일을 열어서 실제 MySQL 비밀번호 입력
 ```
 
+#### 로컬 환경 설정
+
 `.streamlit/secrets.toml` 내용:
 
 ```toml
@@ -116,6 +138,17 @@ host = "localhost"
 port = 3306
 user = "root"
 password = "your_password_here"  # 실제 비밀번호로 변경
+database = "project_tracker"
+```
+
+#### AWS RDS 환경 설정
+
+```toml
+[mysql]
+host = "your-rds-endpoint.region.rds.amazonaws.com"
+port = 3306
+user = "root"
+password = "your_rds_password"
 database = "project_tracker"
 ```
 
@@ -152,6 +185,7 @@ project_tracker/
 │
 ├── views/                      # 화면 뷰
 │   ├── __init__.py            # 뷰 초기화
+│   ├── auth.py                # 로그인/회원가입 화면
 │   ├── dashboard.py           # 대시보드 화면
 │   ├── kanban.py              # 칸반 보드 화면
 │   └── retrospective.py       # 회고 화면
@@ -172,8 +206,10 @@ project_tracker/
 
 - **Frontend**: Streamlit (Python 웹 프레임워크)
 - **Charts**: Plotly (인터랙티브 차트)
-- **Database**: MySQL 8.4+
+- **Database**: MySQL 8.4+ (로컬) / AWS RDS (배포)
 - **Language**: Python 3.13+
+- **Deployment**: Streamlit Cloud
+- **Authentication**: SHA-256 해싱 (비밀번호 암호화)
 
 ### 주요 패키지
 
@@ -190,13 +226,26 @@ mysql-connector-python==9.5.0  # MySQL 연결
 
 ## 💡 사용 방법
 
-### 1. 프로젝트 생성
+### 1. 회원가입 및 로그인
+
+**회원가입**:
+1. 앱 실행 시 로그인 화면에서 "회원가입" 버튼 클릭
+2. 이름, 이메일, 비밀번호 입력
+3. 비밀번호는 최소 6자 이상이어야 함
+4. "가입하기" 버튼 클릭
+
+**로그인**:
+1. 이메일과 비밀번호 입력
+2. "로그인" 버튼 클릭
+3. 사용자별로 독립적인 프로젝트 관리 가능
+
+### 2. 프로젝트 생성
 
 1. 사이드바에서 "➕ 새 프로젝트" 클릭
 2. 프로젝트명, 시작일, 목표일 입력
 3. "생성" 버튼 클릭
 
-### 2. 태스크 추가
+### 3. 태스크 추가
 
 **빠른 추가** (Kanban 보드):
 - 상단 입력창에 제목 입력 후 Enter
@@ -205,17 +254,17 @@ mysql-connector-python==9.5.0  # MySQL 연결
 - "새 태스크" 버튼 클릭
 - 모든 정보 입력 (제목, 설명, 우선순위 등)
 
-### 3. 태스크 이동
+### 4. 태스크 이동
 
 - 각 카드의 버튼 클릭
 - To Do → In Progress → Done
 
-### 4. 진행률 확인
+### 5. 진행률 확인
 
 - 대시보드 탭에서 차트로 확인
 - 메트릭 카드로 빠른 확인
 
-### 5. 회고 작성
+### 6. 회고 작성
 
 - 회고 탭 이동
 - KPT 작성
@@ -258,6 +307,47 @@ pip install -r requirements.txt
 # 다른 포트로 실행
 streamlit run app.py --server.port 8502
 ```
+
+---
+
+## 🌐 배포 정보
+
+### Streamlit Cloud
+
+이 프로젝트는 Streamlit Cloud에 배포되어 있습니다.
+
+**🔗 배포 URL**: [https://simple-project-tracker.streamlit.app/](https://simple-project-tracker.streamlit.app/)
+
+### 데이터베이스
+
+- **서비스**: AWS RDS (Relational Database Service)
+- **엔진**: MySQL 8.4+
+- **특징**:
+  - 고가용성 및 자동 백업
+  - 보안 그룹을 통한 접근 제어
+  - Streamlit Cloud에서 안전한 연결
+
+### 배포 방법
+
+1. **Streamlit Cloud에 배포**:
+   - GitHub 저장소를 Streamlit Cloud에 연결
+   - `app.py`를 메인 파일로 설정
+   - Secrets에 AWS RDS 연결 정보 입력
+
+2. **AWS RDS 설정**:
+   - MySQL 인스턴스 생성
+   - 보안 그룹에서 Streamlit Cloud IP 허용
+   - 데이터베이스 스키마 및 마이그레이션 실행
+
+3. **Secrets 설정** (Streamlit Cloud):
+   ```toml
+   [mysql]
+   host = "your-rds-endpoint.region.rds.amazonaws.com"
+   port = 3306
+   user = "root"
+   password = "your_password"
+   database = "project_tracker"
+   ```
 
 ---
 
